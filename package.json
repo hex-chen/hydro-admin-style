@@ -1,0 +1,11 @@
+{
+  "name": "hydro-admin-style",
+  "version": "0.1.0",
+  "description": "Hydro OJ 插件：隐藏 SU/MOD 徽章和等级标签，管理员用户名显示为紫色",
+  "main": "index.ts",
+  "license": "MIT",
+  "keywords": ["hydro", "hydrooj", "theme"],
+  "peerDependencies": {
+    "hydrooj": ">=4.0.0"
+  }
+}
