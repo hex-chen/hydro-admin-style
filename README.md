@@ -1,10 +1,11 @@
 # hydro-admin-style
 
-Hydro OJ 插件：**隐藏用户名旁的 SU / MOD 徽章和 LV 等级标签，管理员用户名改为紫色**。
+Hydro OJ 插件，两件事：
 
-- 超级管理员（SU）和域管理员（MOD）的用户名显示为紫色（默认 `#9c3dcf`，改 `frontend/admin-style.page.ts` 里的 `ADMIN_COLOR`）
-- 用户自定义徽章（badge）照常显示
-- 纯前端样式，不改数据、不加接口；适配 Hydro 4 / 5 的 ui-default
+1. **隐藏用户名旁的 SU 徽章和 LV 等级标签，超级管理员用户名改为紫色**（默认 `#9c3dcf`，改 `frontend/admin-style.page.ts` 里的 `ADMIN_COLOR`）。MOD 徽章和用户自定义徽章照常显示。
+2. **让 uid 1（默认超管账号）参与排名**。Hydro 原版在排行榜页、首页排行和 RP 脚本的名次/等级计算里都写死排除了 uid 1，本插件覆盖这三处。
+
+适配 Hydro v5.0.x（对着 5.0.4 源码写的）。
 
 ## 安装
 
@@ -15,21 +16,26 @@ hydrooj addon add ~/.hydro/addons/hydro-admin-style
 pm2 restart hydrooj
 ```
 
-启动日志出现 `UI addons built` 后刷新页面即生效（第一次编译可能要等十几秒）。
+重启后到 **系统管理 → 脚本**，运行 `rp`（不填参数即全部域），uid 1 才会有名次和 LV。
 
-## 不装插件的替代做法
+## 卸载
 
-系统管理 → 系统设置 → `ui-default.footer_extra_html`，填入：
-
-```html
-<style>
-.user-profile-badge.badge--su,.user-profile-badge.badge--mod,.user-profile-badge[class*="badge--lv"]{display:none!important}
-.user-profile-link:has(.badge--su) .user-profile-name,.user-profile-link:has(.badge--mod) .user-profile-name{color:#9c3dcf!important}
-</style>
+```bash
+hydrooj addon remove hydro-admin-style && pm2 restart hydrooj
 ```
 
-保存即生效，无需重启。区别是依赖浏览器支持 CSS `:has()`（Chrome 105+ / Safari 15.4+ / Firefox 121+）。
+卸载后再跑一次 `rp` 脚本，uid 1 的名次会重新清掉。
 
-## 只想紫 SU、不紫 MOD？
+## 只想要样式、不想装插件
 
-把两处 `.badge--mod` 相关的行删掉即可。
+系统管理 → 系统设置 → `ui-default.footer_extra_html` 填下面**这一行**（这个设置按行拆分，必须写在一行里）：
+
+```html
+<style>.user-profile-badge.badge--su,.user-profile-badge[class*="badge--lv"]{display:none!important}.user-profile-link:has(.badge--su) .user-profile-name{color:#9c3dcf!important}</style>
+```
+
+## 附：RP 的几条规则（原版行为，插件没改）
+
+- 题目上传者（owner）做自己的题不算题目 RP
+- 隐藏题、比赛/作业内的提交不算题目 RP
+- RP 按域独立计算

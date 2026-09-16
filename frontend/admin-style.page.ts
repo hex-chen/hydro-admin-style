@@ -4,16 +4,14 @@ import { addPage, Page } from '@hydrooj/ui-default';
 const ADMIN_COLOR = '#9c3dcf';
 
 const style = `
-/* 隐藏 SU / MOD 徽章和 LV 等级标签 */
+/* 隐藏 SU 徽章和 LV 等级标签（MOD 徽章保留） */
 .user-profile-badge.badge--su,
-.user-profile-badge.badge--mod,
 .user-profile-badge[class*="badge--lv"] {
   display: none !important;
 }
 
-/* 同一个 .user-profile-link 里带 SU/MOD 徽章的用户名变紫（徽章虽隐藏，仍在 DOM 里） */
+/* 同一个 .user-profile-link 里带 SU 徽章的用户名变紫（徽章虽隐藏，仍在 DOM 里） */
 .user-profile-link:has(.badge--su) .user-profile-name,
-.user-profile-link:has(.badge--mod) .user-profile-name,
 .user-profile-name.is-admin {
   color: ${ADMIN_COLOR} !important;
 }
@@ -21,7 +19,7 @@ const style = `
 
 // 旧浏览器不支持 :has()，用 JS 兜底加 class
 function markAdmins(root: ParentNode = document) {
-  root.querySelectorAll('.badge--su, .badge--mod').forEach((badge) => {
+  root.querySelectorAll('.badge--su').forEach((badge) => {
     const name = badge.closest('.user-profile-link')?.querySelector('.user-profile-name');
     if (name) name.classList.add('is-admin');
   });
