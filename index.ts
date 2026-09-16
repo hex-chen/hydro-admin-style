@@ -19,7 +19,11 @@ const RANK_FILTER = { uid: { $gt: 0 }, rp: { $gt: 0 } };
 
 function patchHandlers(ctx: Context) {
     ctx.withHandlerClass('DomainRankHandler', (H: any) => {
-        H.prototype.get = async function get(domainId: string, page = 1) {
+        // 原版 get 带 @query 装饰器，装饰器把参数对象解析后再传入；
+        // 直接替换 prototype.get 会绕过装饰器，所以这里自己从 args 里取
+        H.prototype.get = async function get(args: any) {
+            const domainId: string = args?.domainId ?? this.args.domainId;
+            const page = Math.max(1, parseInt(args?.page ?? this.args.page, 10) || 1);
             const [dudocs, upcount, ucount] = await this.paginate(
                 DomainModel.getMultiUserInDomain(domainId, { ...RANK_FILTER, join: true }).sort({ rp: -1 }),
                 page,
