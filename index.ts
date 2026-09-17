@@ -12,8 +12,8 @@ import {
     Context, db, DomainModel, PERM, PRIV, Schema, STATUS, UserModel,
 } from 'hydrooj';
 
-// 只排除游客（uid 0），其余全部参与
-const RANK_FILTER = { uid: { $gt: 0 }, rp: { $gt: 0 } };
+// 只排除游客（uid 0），其余全部参与，rp 为 0 / 没算过的也列出来（排在最后）
+const RANK_FILTER = { uid: { $gt: 0 } };
 
 // ---------- 1. 排行榜页 & 首页排行 ----------
 
@@ -65,15 +65,16 @@ async function calcLevel(domainId: string, report: Report) {
     let rank = 0;
     let count = 0;
     const coll = db.collection('domain.user');
-    // 原版：uid: { $nin: [0, 1], $gt: -1000 }
-    const filter = { rp: { $gt: 0 }, uid: { $nin: [0], $gt: -1000 } };
+    // 原版：{ rp: { $gt: 0 }, uid: { $nin: [0, 1], $gt: -1000 } }
+    // 这里不再要求 rp > 0，rp 为 0 或没算过的也参与排名（排在最后，并列同名次）
+    const filter = { uid: { $nin: [0], $gt: -1000 } };
     const ducur = DomainModel.getMultiUserInDomain(domainId, filter)
         .project({ rp: 1 })
         .sort({ rp: -1 });
     let bulk = coll.initializeUnorderedBulkOp();
     for await (const dudoc of ducur) {
         count++;
-        dudoc.rp ||= null;
+        dudoc.rp ||= 0;
         if (dudoc.rp !== last.rp) rank = count;
         bulk.find({ _id: dudoc._id }).updateOne({ $set: { rank } });
         last = dudoc;
