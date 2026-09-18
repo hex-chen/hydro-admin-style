@@ -1,6 +1,8 @@
 /**
  * hydro-admin-style
- *  1. 前端样式（frontend/admin-style.page.ts）：隐藏 SU / LV 标签，SU 用户名紫色
+ *  1. SU 用户名标记：服务端把拥有 PRIV_MOD_BADGE（SU 徽章）的 uid 列表放进 UiContext.suUids，
+ *     前端（frontend/admin-style.page.ts）给所有指向这些用户的 .user-profile-name 链接加 uname--su 类并染紫，
+ *     模板渲染、@ 提及、异步加载的内容都覆盖到
  *  2. 让 uid 1（默认超管）参与排名：
  *     - 排行榜页 /ranking 和首页排行不再过滤 uid 1
  *     - 重算 RP 时 uid 1 也分配名次和等级（LV）
@@ -25,7 +27,8 @@ function patchHandlers(ctx: Context) {
             const domainId: string = args?.domainId ?? this.args.domainId;
             const page = Math.max(1, parseInt(args?.page ?? this.args.page, 10) || 1);
             const [dudocs, upcount, ucount] = await this.paginate(
-                DomainModel.getMultiUserInDomain(domainId, { ...RANK_FILTER, join: true }).sort({ rp: -1 }),
+                // 原版还要求 join: true，这里去掉，没「加入域」的用户也列出来
+                DomainModel.getMultiUserInDomain(domainId, RANK_FILTER).sort({ rp: -1 }),
                 page,
                 'ranking',
             );
@@ -112,6 +115,13 @@ async function runInDomain(domainId: string, report: Report) {
         }
         if (bulk.batches.length) await bulk.execute();
     }
+    // 从没提交过的用户在 domain.user 里没有记录，排行榜按这张表查就看不到他们；
+    // 这里给所有正常用户（uid > 1 的普通用户 + uid 1）补一条 rp=0 的记录
+    const allUsers = await UserModel.getMulti({ _id: { $gt: 0 } }).project({ _id: 1, priv: 1 }).toArray();
+    for (const u of allUsers) {
+        if (u.priv === 0) continue; // 被封禁的不列
+        if (!(u._id in udict)) udict[u._id] = 0;
+    }
     await DomainModel.setMultiUserInDomain(domainId, {}, { rp: 0 });
     const bulk = db.collection('domain.user').initializeUnorderedBulkOp();
     for (const uid in udict) {
@@ -156,8 +166,32 @@ function patchScript(ctx: Context) {
     });
 }
 
+// ---------- 3. SU 名单 → UiContext ----------
+
+let suUids: number[] = [];
+let suLoadedAt = 0;
+const SU_TTL = 5 * 60 * 1000;
+
+async function loadSu() {
+    const docs = await UserModel.getMulti({ priv: { $bitsAllSet: PRIV.PRIV_MOD_BADGE } })
+        .project({ _id: 1 }).toArray();
+    suUids = docs.map((d) => d._id);
+    suLoadedAt = Date.now();
+}
+
+function patchUiContext(ctx: Context) {
+    ctx.on('handler/before' as any, async (h: any) => {
+        if (Date.now() - suLoadedAt > SU_TTL) await loadSu().catch(() => { });
+        if (h.UiContext) h.UiContext.suUids = suUids;
+    });
+    // 权限被改后立刻刷新
+    ctx.on('handler/after/SystemUserPriv' as any, () => loadSu().catch(() => { }));
+    ctx.on('handler/after/DomainUser' as any, () => loadSu().catch(() => { }));
+}
+
 export function apply(ctx: Context) {
     patchHandlers(ctx);
+    patchUiContext(ctx);
     // Hydro 先加载插件、后加载内置脚本（见 src/entry/worker.ts），
     // 所以要等 app/started 之后再替换 rp 脚本，否则会被内置的覆盖/报重复注册
     ctx.on('app/started', () => patchScript(ctx));
